@@ -1,0 +1,45 @@
+'403 Forbidden' error message when you try to push to a GitHub repository using HTTPS
+Problem
+
+When you try to push changes to a GitHub repository from an A2 Hosting server using an HTTPS URL,
+you receive the following error message:
+error: The requested URL returned error: 403 Forbidden while accessing 
+https://github.com/github-username/github-repository-name.git/info/refs
+
+Cause
+
+There are a few possible causes for this problem:
+
+You typed an incorrect password. Make sure you are using the correct GitHub password for the account.
+The Git client on the A2 Hosting server requires a modified HTTPS URL to work correctly. If this is the 
+cause, the password prompt does not even appear when you try to do a push operation.
+Resolution
+
+If you are sure you are using the correct GitHub password, there are two ways to resolve the “403 Forbidden” problem:
+
+Method #1: Use SSH
+
+Instead of using HTTPS URLs to push changes to GitHub, you can use SSH instead. For information about how to do this, 
+please visit https://help.github.com/articles/changing-a-remote-s-url.
+
+Method #2: Modify the HTTPS URL
+
+Some A2 Hosting managed servers have an old version of the Git client installed. To push changes to GitHub using this 
+older client version, you must include your GitHub username in the HTTPS URL.
+
+To do this, follow these steps:
+1. Log in to your A2 Hosting account using SSH.
+2. At the command prompt, change to the directory where the Git repository is located.
+
+Type the following command:
+	git config -l | grep url
+You should see output that resembles the following:
+   remote.origin.url=https://github.com/github-username/github-repository-name.git
+4. You need to add your GitHub username to the github.com portion of the URL. To do this, type the following command, 
+replacing the values in red with your own account information:
+   git remote set-url origin "https://github-username@github.com/github-username/github-repository-name.git"
+5. To verify the new remote URL setting, type the following command:
+git config -l | grep url
+Now when you try to push changes to the GitHub repository, you are prompted for a password, and the push operation should succeed.
+
+
