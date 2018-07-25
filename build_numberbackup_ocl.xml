@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="windows-1252" ?>
+<project default="backup_buildnumber">
+  <property file="properties/common.properties"/>
+  <property file="${oc.parent.dir}/release.marker.ocl"/>
+  <target name="backup_buildnumber">
+    <propertyfile file="${basedir}/previous.ocl.build.number.properties"
+                  comment="Capture the previous build number for replacing">
+      <entry key="previous-build-number" value="${build}"/>
+    </propertyfile>
+    <propertyfile file="previous.ocl.build.number.properties">
+      <entry key="previous-build-number" type="int" operation="-" value="1"
+             pattern="0"/>
+    </propertyfile>
+    <propertyfile file="${basedir}/previous.ocl.date.properties">
+      <entry key="previous_date" value="${frozen}"/>
+    </propertyfile>
+  </target>
+</project>

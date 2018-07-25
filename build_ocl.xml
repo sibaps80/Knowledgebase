@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="windows-1252" ?>
+<project default="main">
+  <taskdef resource="net/sf/antcontrib/antcontrib.properties">
+    <classpath>
+      <pathelement location="${Libraries}/ant-contrib/ant-contrib-0.6.jar"/>
+    </classpath>
+  </taskdef>
+  <property file="properties/common.properties"/>
+  <property file="${oc.parent.dir}/release.marker.ocl"/>
+  <property file="previous.ocl.build.number.properties"/>
+  <property file="previous.ocl.date.properties"/>
+  <tstamp>
+    <format property="TODAY_US" pattern="d-MMM-yyyy" unit="month"/>
+  </tstamp>
+  <target name="main" depends="init,checkinOCChanges"></target>
+  <target name="init">
+    <echo>Including Build Number True or False???</echo>
+    <echo message="${includeBuildNumber}"></echo>
+    <echo>Build Number?</echo>
+    <echo message="${build}"></echo>
+    <echo>Revision Number?</echo>
+    <echo message="${revision}"></echo>
+    <echo message="${revision}"></echo>
+    <echo>Previous Build Number?</echo>
+    <echo message="${previous-build-number}"></echo>
+    <if>
+      <equals arg1="${includeBuildNumber}" arg2="true"/>
+      <then>
+        <propertyfile file="${oc.parent.dir}/release.marker.ocl">
+          <entry key="revision" type="int" default="0" operation="+"/>
+        </propertyfile>
+        <math result="revision.new" operand1="${revision}" operation="+"
+              operand2="1" datatype="int"/>
+        <echo message="Revision number after this build is: ${revision.new}"></echo>
+        <echo>Replacing version in file: OCL Rel Properties</echo>
+        <replaceregexp flags="g" file="${oc.parent.dir}/client/OCrel.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}r${revision.new}"/>
+        <replaceregexp file="${oc.parent.dir}/client/OCrel.properties"
+                       match="[0-9]+\_[0-9]+\_[0-9]+\_[0-9]+\_[0-9A-z]+"
+                       replace="${major}_${minor}_${patchset}_${ipatch}_${build}r${revision.new}"/>
+        <replaceregexp file="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/buildRdc.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>
+        <replaceregexp flags="g" file="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/public_html/WEB-INF/version.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>					   
+        <echo>Replacing build number in packager code: MT</echo>
+        <replaceregexp match="${major}.${minor}.${patchset}.${ipatch}.${previous-build-number}"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"
+                       flags="g" byline="true">
+          <fileset dir="${oc.parent.dir}/packager">
+            <include name="**/*.prp"/>
+          </fileset>
+        </replaceregexp>
+        <replaceregexp match="${major}.${minor}.${patchset}.${ipatch}.${previous-build-number}"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"
+                       flags="g" byline="true">
+          <fileset dir="${oc.parent.dir}/packager">
+            <include name="**/*.dep"/>
+          </fileset>
+        </replaceregexp>
+        <replace file="${oc.parent.dir}/release.marker.ocl"
+                 token="${previous_date}" value="${TODAY_US}"/>
+      </then>
+      <else>
+        <echo>Replacing version in file: OCrel.properties</echo>
+        <replaceregexp file="${oc.parent.dir}/release.marker.ocl"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>
+        <replaceregexp flags="g" file="${oc.parent.dir}/client/OCrel.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>
+        <replaceregexp file="${oc.parent.dir}/client/OCrel.properties"
+                       match="[0-9]+\_[0-9]+\_[0-9]+\_[0-9]+\_[0-9A-z]+"
+                       replace="${major}_${minor}_${patchset}_${ipatch}_${build}"/>
+        <replaceregexp file="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/buildRdc.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>
+        <replaceregexp flags="g" file="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/public_html/WEB-INF/version.properties"
+                       match="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.[0-9A-z]+"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"/>						   
+        <echo>Replacing build number in packager code: MT</echo>
+        <replaceregexp match="${major}.${minor}.${patchset}.${ipatch}.${previous-build-number}"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"
+                       flags="g" byline="true">
+          <fileset dir="${oc.parent.dir}/packager">
+            <include name="**/*.prp"/>
+          </fileset>
+        </replaceregexp>
+        <replaceregexp match="${major}.${minor}.${patchset}.${ipatch}.${previous-build-number}"
+                       replace="${major}.${minor}.${patchset}.${ipatch}.${build}"
+                       flags="g" byline="true">
+          <fileset dir="${oc.parent.dir}/packager">
+            <include name="**/*.dep"/>
+          </fileset>
+        </replaceregexp>
+        <replace file="${oc.parent.dir}/release.marker.ocl"
+                 token="${previous_date}" value="${TODAY_US}"/>
+      </else>
+    </if>
+    <tstamp/>
+  </target>
+  <target name="checkinOCChanges">
+    <exec executable="svn" failonerror="true">
+      <arg value="commit"/>
+      <arg value="${oc.parent.dir}/release.marker.ocl"/>
+      <arg value="${oc.parent.dir}/client/OCrel.properties"/>
+      <arg value="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/buildRdc.properties"/>
+      <arg value="${oc.parent.dir}/appserver/RdcOnsiteAdfApp/RdcSurroundAdfWebUI/public_html/WEB-INF/version.properties"/>
+      <arg value="${oc.parent.dir}/packager/oc_frontend/oc_frontend.prp"/>
+      <arg value="${oc.parent.dir}/packager/oc_frontend/oc_frontend.dep"/>
+      <arg value="${oc.parent.dir}/packager/rdc_frontend/rdc_frontend.prp"/>
+      <arg value="${oc.parent.dir}/packager/rdc_frontend/rdc_frontend.dep"/>
+      <arg value="${oc.parent.dir}/packager/oc_reportserver/oc_reportserver.prp"/>
+      <arg value="${oc.parent.dir}/packager/oc_reportserver/oc_reportserver.dep"/>
+      <arg value="${oc.parent.dir}/packager/oc_db_upgrade/oc_db_upgrade.prp"/>
+      <arg value="${oc.parent.dir}/packager/oc_db_install/oc_db_install.prp"/>
+      <arg value="${oc.parent.dir}/packager/oc_server_unix/oc_server_unix.prp"/>
+      <arg value="${oc.parent.dir}/packager/oc_server_win/oc_server_win.prp"/>
+      <arg value="-m Changed by build number increment script"/>
+    </exec>
+  </target>
+</project>

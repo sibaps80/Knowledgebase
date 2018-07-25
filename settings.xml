@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings
+    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd"
+    xmlns="http://maven.apache.org/SETTINGS/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <proxies>
+        <proxy>
+            <!-- Set up a proxy to be able to access things! -->
+            <active>true</active>
+            <host>adc-proxy.oracle.com</host>
+            <port>80</port>
+            <nonProxyHosts>localhost|localhost.localdomain|127.0.0.1|::1|dsohl-us.us.oracle.com|dsohl-us|10.138.234.38|bur01243|bur01243.us.oracle.com</nonProxyHosts>
+        </proxy>
+    </proxies>
+    <servers>
+        <server>
+            <!-- This server is no longer used, but is here as an example of property encryption -->
+            <id>maven.oracle.com</id>
+            <username>daniel.sohl@oracle.com</username>
+            <password>ENCRYPTED SSO PASSWORD : {yUKyWHsLkz0Ha0a5L4y7+mSwp51RPhmqGECBpOL4XDA=}</password>
+            <configuration>
+                <basicAuthScope>
+                    <host>ANY</host>
+                    <port>ANY</port>
+                    <realm>OAM 11g</realm>
+                </basicAuthScope>
+                <httpConfiguration>
+                    <all>
+                        <params>
+                            <property>
+                                <name>http.protocol.allow-circular-redirects</name>
+                                <value>%b,true</value>
+                            </property>
+                        </params>
+                    </all>
+                </httpConfiguration>
+            </configuration>
+        </server>
+    </servers>
+    <profiles>
+        <profile>
+            <id>local-ec-db</id>
+            <activation>
+                <property>
+                    <!-- These properties are in effect if NO "db" property is set -->
+                    <!-- mvn clean install -->
+                    <name>!db</name>
+                </property>
+            </activation>
+            <properties>
+                <jdbc.url>jdbc:oracle:thin:@//localhost:1521/eclinicalpdb</jdbc.url>
+                <jdbc.username>eclinical</jdbc.username>
+                <jdbc.password>eclinical</jdbc.password>
+                <ecdesigner.username>ecdesigner</ecdesigner.username>
+                <ecdesigner.password>ecdesigner</ecdesigner.password>
+                <jdbc.driverClassName>oracle.jdbc.OracleDriver</jdbc.driverClassName>
+            </properties>
+        </profile>
+        <profile>
+            <id>vm-ec-db</id>
+            <activation>
+                <property>
+                    <!-- These properties are in effect if db=vm -->
+                    <!-- mvn -Ddb=vm clean install -->
+                    <name>db</name>
+                    <value>vm</value>
+                </property>
+            </activation>
+            <properties>
+                <jdbc.url>jdbc:oracle:thin:@//slc06owr.us.oracle.com:1521/slc06owr.us.oracle.com</jdbc.url>
+                <jdbc.username>eclinical</jdbc.username>
+                <jdbc.password>eclinical</jdbc.password>
+                <jdbc.driverClassName>oracle.jdbc.OracleDriver</jdbc.driverClassName>
+                <liquibase.promptOnRemoteDB>false</liquibase.promptOnRemoteDB>
+			</properties>
+        </profile>
+        <profile>
+            <id>local-ec-wls</id>
+            <activation>
+                <property>
+                    <!-- Again, in effect when no 'wls' property is set; see above -->
+                    <name>!wls</name>
+                </property>
+            </activation>
+            <properties>
+                <weblogic.admin.user>weblogic</weblogic.admin.user>
+                <weblogic.admin.password>weblogic1</weblogic.admin.password>
+                <weblogic.target.server>AdminServer</weblogic.target.server>
+                <outputDirectory>${project.build.directory}</outputDirectory>
+                <weblogic.admin.url>t3://localhost:7001</weblogic.admin.url>
+                <weblogic.domain.home>C:\domains\eclinical</weblogic.domain.home>
+                <weblogic.home>C:\Oracle\Middleware\Oracle_Home\wlserver</weblogic.home>
+                <!-- <weblogic.admin.user>weblogic</weblogic.admin.user> 
+                    <weblogic.admin.password>weblogic1</weblogic.admin.password> <weblogic.target.server>LocalCluster</weblogic.target.server> 
+                    <outputDirectory>${project.build.directory}</outputDirectory> <weblogic.admin.url>t3://localhost:7001</weblogic.admin.url> 
+                    <weblogic.domain.home>C:\Oracle\Middleware\domains\eclinical</weblogic.domain.home> 
+                    <weblogic.home>C:\Oracle\Middleware\FMW1213</weblogic.home> -->
+            </properties>
+        </profile>
+        <profile>
+            <id>artifactory-vpn</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <repositories>
+                <repository>
+                    <id>central</id>
+                    <name>HSGBU Central</name>
+                    <url>http://bogus-url</url>
+                    <releases>
+                        <enabled>true</enabled>
+                        <updatePolicy>never</updatePolicy>
+                        <checksumPolicy>warn</checksumPolicy>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>daily</updatePolicy>
+                        <checksumPolicy>warn</checksumPolicy>
+                    </snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>central</id>
+                    <name>HSGBU Central</name>
+                    <url>http://bogus-url</url>
+                    <releases>
+                        <enabled>true</enabled>
+                        <updatePolicy>never</updatePolicy>
+                    </releases>
+                    <snapshots>
+                        <enabled>true</enabled>
+                        <updatePolicy>daily</updatePolicy>
+                    </snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+    <pluginGroups>
+        <pluginGroup>com.oracle.weblogic</pluginGroup>
+        <pluginGroup>org.liquibase</pluginGroup>
+        <pluginGroup>org.codehaus.sonar</pluginGroup>
+    </pluginGroups>
+    <mirrors>
+        <mirror>
+            <id>slc06xjn-central</id>
+            <name>HSGBU Central Mirror</name>
+            <mirrorOf>external:*,!hsgbu-releng-tools</mirrorOf>
+   <!--         <url>https://slc06xjn.us.oracle.com:443/artifactory/local-hsgbu-and-remotes</url> -->
+            <url>https://hsgbu-artifactory.oraclecorp.com/artifactory/local-hsgbu-and-remotes</url>
+        </mirror>
+    </mirrors>
+</settings>

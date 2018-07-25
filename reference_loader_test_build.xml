@@ -1,0 +1,525 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="db_build" default="java_loader">
+<taskdef resource="net/sf/antcontrib/antcontrib.properties"/>
+
+	<description>
+    Getting the latest stable Java Reference Loader and loading seed reference data for Results loader testing to the build DB
+  </description>
+	<!-- set global properties for this build -->
+	<!-- this is needed to use the environment variables-->
+	<property environment="env"/>
+	<!--directories-->
+	<property name = "workspace" value="${env.WORKSPACE}"/>
+	<property name = "temp" location="${workspace}/temp"/>
+	<property name = "java_loader" location="${workspace}/java_loader"/>
+	<property name = "library" location="${java_loader}/lib"/>
+	<property name = "seed_data" location="${workspace}/data"/>
+  <property name = "embl_dir" location="${EMBL_LOCATION}"/>
+  <property name = "check_version_dir" location = "${workspace}/SQL_Loader"/>
+  <property name = "ref" location="${check_version_dir}/Reference"/>
+  <property name = "TestData" location="${ref}/TestData"/>
+  <property name = "data_directory" value="TMP_ODB_LOAD" />
+  <property name = "data_directory_location" location="${TestData}"/>
+  <property name = "sys_pwd" value="${SYS_PWD}"/>
+  
+  
+  <property name = "adf" location = "${ref}/ADF_Loader"/>
+  <property name = "hugo" location = "${ref}/Hugo_Loader"/>
+  <property name = "gvf" location = "${ref}/GVF_Loader"/>
+  <property name = "hgmd" location = "${ref}/HGMD_Loader"/>
+  <property name = "probe" location = "${ref}/Probe_Loader"/>
+  <property name = "pathway" location = "${ref}/Pathway_Loader" />
+  <property name = "prediction" location = "${ref}/Prediction_Loader" />
+
+
+	<!-- property name = "seed_data" value="/home/oracle/BigDataFilesHudson/ReferenceSeedData"/-->
+
+	<!-- DB access env variables-->
+  <propertyregex property="db_connection"
+               input="${DB_CONNECTION}"
+               regexp=" "
+               replace=""
+               global="true" />
+  <property name = "cdm_schema" value="${CDM_SCHEMA}"/>
+  <property name = "cdm_pwd" value="${CDM_SCHEMA}"/>
+  <property name = "odb_schema" value="${ODB_SCHEMA}"/>
+  <property name = "odb_pwd" value="${ODB_SCHEMA}"/>
+<!--	<property name="jdbc_connection" value="${env.OHC_PDB_JDBC_CONNECTION}"/> -->
+	<property name="tnsHome" value="${TNS_ADMIN}"/>
+	<property name="orclWallet" value="${WALLET_NAME}"/>
+	<property name="orclWalletLocation" value="${WALLET_LOCATION}"/>
+	<!--Project name and artifact name to get the latest stable build of the Java Loader - to load seed EMBL and SwissProt data - CHANGE, if project renamed! -->
+<!--	<property name="hudson_url" value="http://bus00afn.us.oracle.com:8080/job"/> -->
+  <property name="hudson_url" value="${env.HUDSON_URL}"/>
+	<property name="proj_java_ref_loader" value="${JAVA_LOADER_BUILD_JOB}"/>
+	<property name="art_java_ref_loader" value="${JAVA_LOADER_BUILD_ARTEFACT}"/>
+  <property name="chromosomes" value="${CHROMOSOMES}"/>
+  <property name="reference_version" value="${REFERENCE_VERSION}"/>
+  <property name="ref.java.loader.zip.source" 	value="https://hsgbu-artifactory.oraclecorp.com/artifactory/one-healthcare/RefJavaLoader/7.2/RefJavaLoader.zip"/>
+ 
+  
+	<!-- delete old stuff and re-create directories-->
+	<target name="init">
+		<delete dir="${java_loader}"/>
+		<mkdir dir="${java_loader}"/>
+		<delete dir="${temp}"/>
+		<mkdir dir="${temp}"/>
+
+    <!-- create a temp oracle directory object pointing to TestData -->
+    <exec executable="sqlplus" failonerror="true" dir="${ref}">
+      <arg value="sys/${sys_pwd}@${db_connection} as sysdba"/>
+      <arg value="@create_tmp_dir.sql"/>
+      <arg value="${data_directory}"/>
+      <arg value="${data_directory_location}"/>
+      <arg value="${odb_schema}"/>
+    </exec>
+	
+    <exec executable="sqlplus" failonerror="true" dir="${TestData}">
+      <arg value="/@${orclWallet}"/>
+      <arg value="@init_log_level.sql"/>
+    </exec>
+  </target>
+  
+ 
+	<!-- retrieve ans install  the latest stable java loader >
+	<target name="get_java_loader" depends="init">
+		< download the last stable build of the Java Reference Loader >
+		<echo message="${hudson_url}/job/${proj_java_ref_loader}/lastStableBuild/artifact/build/${art_java_ref_loader}"/>
+		<echo message="${temp}"/>
+		<get src="${hudson_url}/job/${proj_java_ref_loader}/lastStableBuild/artifact/build/${art_java_ref_loader}" dest="${temp}/${art_java_ref_loader}"/>
+		< and unzip it >
+		<unzip src="${temp}/${art_java_ref_loader}" dest="${java_loader}"/>
+	</target-->
+	
+	<target name="get_java_loader" depends="init">
+		<!-- download the last stable build of the Java Reference Loader -->
+		<echo message="${ref.java.loader.zip.source}"/>
+		<echo message="${temp}"/>
+		<get src="${ref.java.loader.zip.source}" dest="${temp}/${art_java_ref_loader}"/>
+		<!-- and unzip it -->
+		<unzip src="${temp}/${art_java_ref_loader}" dest="${java_loader}"/>
+	</target>
+ 
+	<!-- load seed reference data - if there is none -->
+	<target name="java_loader" depends="get_java_loader" >
+		<echo message="Loading reference data (Java)"/>
+		<!-- delete the GDM.log file, or it will grow, and grow, and grow -->
+		<delete file="${workspace}/gdm.log"/>
+		<!--Create the seed versions GRCh37.p75 and Release_2012_11 in the DB if not already exists -->
+		<exec executable="sqlplus" inputstring="" failonerror="true" dir="${workspace}">
+			<arg value="${odb_schema}/${odb_pwd}@${db_connection}"/>
+			<arg value="@script2.sql"/>
+		</exec>
+		<echo message="${cdm_schema}/${cdm_pwd}@${db_connection}"/>
+		<exec executable="sqlplus" inputstring="" failonerror="true" dir="${workspace}">
+			<arg value="${cdm_schema}/${cdm_pwd}@${db_connection}"/>
+			<arg value="@script4.sql"/>
+		</exec>
+    
+    <for list="${chromosomes}" param="chromosome">
+      <sequential>
+        <!-- Check the DB to see the chromosome for this version has already been loaded -->
+        <delete file="${java_loader}/temp.properties"/>
+        <sql driver="oracle.jdbc.OracleDriver" password="${odb_pwd}" url="jdbc:oracle:thin:@${db_connection}" userid="${odb_schema}" 
+          output="${java_loader}/temp.properties" print="yes" expandproperties="true" showheaders="false" showtrailers="false">
+        <classpath>
+          <pathelement path="${library}/ojdbc7.jar"/>
+        </classpath>
+        <![CDATA[
+          select case when count(*) > 0 then 'db.dna_source_exists=yes' else 'db.dna_source_exists=no' end as outval
+          from W_EHA_DNA_SOURCE d, W_EHA_VERSION v, w_eha_chromosome c
+          where d.version_wid=v.row_wid
+            and upper(version_label) = upper('${reference_version}')
+            and d.chromosome_wid = c.row_wid
+            and c.chromosome = upper('@{chromosome}')
+          ;
+        ]]>
+        </sql>
+        <var file="${java_loader}/temp.properties"/>
+        <echo message="Chromosome @{chromosome}: db.dna_source_exists: ${db.dna_source_exists}"/>
+        <if>
+          <equals arg1 = "${db.dna_source_exists}" arg2 = "no" />
+          <then>
+            <echo message="Loading reference data from ${embl_dir}/Homo_sapiens.GRCh37.75.chromosome.@{chromosome}.dat.gz EMBL file"/>
+            <echo message="java"/>
+            <echo message="-jar"/>
+            <echo message="${java_loader}/GDM.jar"/>
+            <echo message="-url"/>
+            <echo message="${orclWallet}"/>
+            <echo message="-orahome"/>
+            <echo message="${tnsHome}"/>
+            <echo message="-wallet"/>
+            <echo message="${orclWalletLocation}"/>
+            <echo message="-schema"/>
+            <echo message="${odb_schema}"/>
+            <echo message="-version"/>
+            <echo message="${reference_version}"/>
+            <echo message="${embl_dir}/Homo_sapiens.GRCh37.75.chromosome.@{chromosome}.dat.gz"/>
+            <echo message="-updateDB"/>
+            <echo message="-verbose"/>
+            <!--
+            <echo message="-print_summary"/>
+            -->
+            <echo message="-updateDB"/>
+            
+            <exec executable="java" inputstring="" failonerror="true" dir="${workspace}">
+              <arg value="-jar"/>
+              <arg value="${java_loader}/GDM.jar"/>
+              <arg value="-url"/>
+              <arg value="${orclWallet}"/>
+              <arg value="-orahome"/>
+              <arg value="${tnsHome}"/>
+              <arg value="-wallet"/>
+              <arg value="${orclWalletLocation}"/>
+              <arg value="-schema"/>
+              <arg value="${odb_schema}"/>
+              <arg value="-version"/>
+              <arg value="${reference_version}"/>
+              <arg value="-updateDB"/>
+              <arg value="-verbose"/>
+              <!--
+              <arg value="-print_summary"/>
+              -->
+              <arg value="${embl_dir}/Homo_sapiens.GRCh37.75.chromosome.@{chromosome}.dat.gz"/>
+            </exec>
+          </then>
+          <else>
+            <echo message="Skipped ${embl_dir}/Homo_sapiens.GRCh37.75.chromosome.@{chromosome}.dat.gz EMBL file as it has already been loaded in verion ${reference_version}"/>
+          </else>
+        </if>
+        <!--<var name="db.dna_source_exists" value=""/>-->
+      </sequential>
+		</for>
+    <!--SwissProt next-->
+		<echo message="Loading reference data from a SwissProt file"/>
+		<exec executable="java" inputstring="" failonerror="true" dir="${workspace}">
+			<arg value="-jar"/>
+			<arg value="${java_loader}/GDM.jar"/>
+			<arg value="-url"/>
+			<arg value="${orclWallet}"/>
+			<arg value="-orahome"/>
+			<arg value="${tnsHome}"/>
+			<arg value="-wallet"/>
+			<arg value="${orclWalletLocation}"/>
+			<arg value="-schema"/>
+			<arg value="${odb_schema}"/>
+			<arg value="-sprot"/>
+			<arg value="-protFile"/>
+			<arg value="${java_loader}/Species.dat"/>
+			<arg value="-version"/>
+			<arg value="Release_2012_11"/>
+			<arg value="-updateDB"/>
+			<!--
+			<arg value="-print_summary"/>
+			-->
+			<arg value="${seed_data}/SwissProt.dat"/>
+		</exec>
+		<!--second SwissProt version next - must fold into the previous one-->
+		<echo message="Loading reference data from a SwissProt file"/>
+		<exec executable="java" inputstring="" failonerror="true" dir="${workspace}">
+			<arg value="-jar"/>
+			<arg value="${java_loader}/GDM.jar"/>
+			<arg value="-url"/>
+			<arg value="${orclWallet}"/>
+			<arg value="-orahome"/>
+			<arg value="${tnsHome}"/>
+			<arg value="-wallet"/>
+			<arg value="${orclWalletLocation}"/>
+			<arg value="-schema"/>
+			<arg value="${odb_schema}"/>
+			<arg value="-sprot"/>
+			<arg value="-protFile"/>
+			<arg value="${java_loader}/Species.dat"/>
+			<arg value="-version"/>
+			<arg value="Release_2012_12"/>
+			<arg value="-updateDB"/>
+      <arg value="-verbose"/>
+			<!--
+			<arg value="-print_summary"/>
+			-->
+			<arg value="${seed_data}/SwissProt.dat"/>
+		</exec>
+		<!--   Create the Reference IOTs -->
+		<echo message="Creating the Reference IOTs"/>
+		<exec executable="sqlplus" inputstring="" failonerror="true" dir="${workspace}">
+			<arg value="${odb_schema}/${odb_pwd}@${db_connection}"/>
+			<arg value="@create_iots.sql"/>
+		</exec>
+	</target>
+  
+  <!--*************-->
+  <!-- SQL Loaders -->
+  <!--*************-->
+  
+  <!-- ADF Loader -->
+  <target name = "adf_loader" depends = "init">
+    <echo message="Loading reference data from an ADF file" />
+    
+    <copy file="${check_version_dir}/check_version.bat" todir="${adf}" />
+    <copy file="${check_version_dir}/check_version.sh" todir="${adf}" />
+    <copy file="${check_version_dir}/load_version.sql" todir="${adf}" />
+    <copy file="${check_version_dir}/version_cnt.sql" todir="${adf}" />
+    <copy file="${check_version_dir}/version_list.sql" todir="${adf}" />		
+
+        <exec dir="${adf}" executable="sh" failonerror="true">
+            <arg value="ADF_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="adf_summary.adf" />			
+            <arg value="-file_uri" />
+            <arg value="ABCDEFADF1" />				
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-user_label" />
+            <arg value="AgilentG4502A_07_01" />
+            <arg value="-reference_version" />
+            <arg value="${reference_version}" />
+            <arg value="-file_flg" />
+            <arg value="E" />
+            <arg value="-file_version"/>
+            <arg value="A"/>
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-preprocess_dir"/>
+          <arg value=""/>
+          <arg value="-preprocess_file"/>
+          <arg value=""/>
+          <arg value="-data_file_path"/>
+          <arg value=""/>
+          <arg value="-dbfs_store"/>
+          <arg value=""/>
+          <arg value="-alt_file_loc"/>
+          <arg value=""/>
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+  <!-- HUGO Loader -->
+  <target name = "hugo_loader" depends = "init">
+    <echo message="Loading reference data from a HUGO file" />
+    
+        <copy file="${check_version_dir}/check_version.bat" todir="${hugo}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${hugo}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${hugo}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${hugo}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${hugo}" />
+
+        <exec dir="${hugo}" executable="sh" failonerror="true">
+            <arg value="hugo_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="hgnc_complete_set.txt" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-reference_version" />
+            <arg value="DLD_DT_01062013" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+  <!-- GVF Loader -->
+  <target name = "gvf_loader" depends = "init">
+      <echo message="Loading reference data from a GVF file" />
+      
+        <copy file="${check_version_dir}/check_version.bat" todir="${gvf}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${gvf}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${gvf}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${gvf}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${gvf}" />
+
+        <exec dir="${gvf}" executable="sh" failonerror="true">
+            <arg value="GVF_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="som_variants.gvf" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-reference_version" />
+            <arg value="${reference_version}" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-preprocess_dir"/>
+          <arg value=""/>
+          <arg value="-preprocess_file"/>
+          <arg value=""/>
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+  <!-- HGMD Loader -->
+  <target name = "hgmd_loader" depends = "init">
+      <echo message="Loading reference data from a HGMD file" />
+      
+        <copy file="${check_version_dir}/check_version.bat" todir="${hgmd}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${hgmd}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${hgmd}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${hgmd}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${hgmd}" />
+
+        <exec dir="${hgmd}" executable="sh" failonerror="true">
+            <arg value="HGMD_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file_suffix" />
+            <arg value="hg19_12" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-dna_version_label" />
+            <arg value="${reference_version}" />
+            <arg value="-hgmd_version_label" />
+            <arg value="2012.04" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+   <!-- Probe Loader -->
+  <target name = "probe_loader" depends = "init">
+      <echo message="Loading reference data from a Probe file" />
+
+        <copy file="${check_version_dir}/check_version.bat" todir="${probe}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${probe}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${probe}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${probe}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${probe}" />
+
+        <exec dir="${probe}" executable="sh" failonerror="true">
+            <arg value="probe_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="dummy_probeset_annotation_summary.txt" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-dna_version_label" />
+            <arg value="${reference_version}" />
+            <arg value="-probe_version_label" />
+            <arg value="PROBE_VER_1" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+   <!-- Pathway Loader -->
+  <target name = "pathway_loader" depends = "init">
+      <echo message="Loading reference data from a Pathway file" />
+
+        <copy file="${check_version_dir}/check_version.bat" todir="${pathway}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${pathway}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${pathway}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${pathway}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${pathway}" />
+
+        <exec dir="${pathway}" executable="sh" failonerror="true">
+            <arg value="pathway_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="homo-sapiens-9606-gene-symbol.gmt" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-reference_version" />
+            <arg value="feb-2011" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+  
+   <!-- Polyphen/SIFT Loader -->
+  <target name = "prediction_loader" depends = "init">
+       <echo message="Executing Polyphen/SIFT Loader" />
+
+        <copy file="${check_version_dir}/check_version.bat" todir="${prediction}" />
+        <copy file="${check_version_dir}/check_version.sh" todir="${prediction}" />
+        <copy file="${check_version_dir}/load_version.sql" todir="${prediction}" />
+        <copy file="${check_version_dir}/version_cnt.sql" todir="${prediction}" />
+        <copy file="${check_version_dir}/version_list.sql" todir="${prediction}" />
+
+       <exec dir="${prediction}" executable="sh" failonerror="true">
+            <arg value="prediction_score_loader.sh" />
+            <arg value="-db_wallet" />
+            <arg value="${orclWallet}" />
+            <arg value="-print_summary" />
+            <arg value="1" />
+            <arg value="-data_file" />
+            <arg value="ut_variant_pred1.txt" />
+            <arg value="-data_directory" />
+            <arg value="${data_directory}" />
+            <arg value="-species_name" />
+            <arg value="'Homo sapiens'" />
+            <arg value="-prediction_version_type" />
+            <arg value="Polyphen" />
+            <arg value="-prediction_version_label" />
+            <arg value="5.0" />
+            <arg value="-reference_version" />
+            <arg value="${reference_version}" />
+            <arg value="-log_level"/>
+            <arg value="DEBUG"/>
+            <!--
+          <arg value="-preprocess_dir"/>
+          <arg value=""/>
+          <arg value="-preprocess_file"/>
+          <arg value=""/>
+          <arg value="-read_size"/>
+          <arg value=""/>
+        -->
+        </exec>
+  </target>
+
+  <!-- reset logger -->
+  <target name="final">
+    <exec executable="sqlplus" failonerror="true" dir="${TestData}">
+      <arg value="/@${orclWallet}"/>
+      <arg value="@fini_log_level.sql" />
+    </exec>
+  </target>
+
+  </project>
